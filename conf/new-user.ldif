@@ -12,3 +12,24 @@ gidNumber: 14564100
 userPassword: {ssha}1h4UO1yKtZAuU3RpgSNhYFRUc6HSqlW48xHYeQ==
 mail: billy@example.org
 gecos: Billy User
+
+dn: cn=alice,dc=example,dc=org
+uid: alice
+cn: alice
+sn: 4
+objectClass: top
+objectClass: posixAccount
+objectClass: inetOrgPerson
+loginShell: /bin/bash
+homeDirectory: /home/alice
+uidNumber: 14583103
+gidNumber: 14564101
+userPassword: {ssha}1h4UO1yKtZAuU3RpgSNhYFRUc6HSqlW48xHYeQ==
+mail: alice@example.org
+gecos: Alice User
+
+dn: cn=cassandra-users,dc=example,dc=org
+objectClass: top
+objectClass: groupOfNames
+cn: cassandra-users
+member: cn=bill,dc=example,dc=org

@@ -21,6 +21,8 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.PlainTextAuthProvider;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.AuthenticationException;
+import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.github.nosan.embedded.cassandra.Cassandra;
 import com.github.nosan.embedded.cassandra.CassandraBuilder;
@@ -65,6 +67,9 @@ public abstract class AbstractLDAPTest {
     private static final String testUserName = "bill";
     private static final String testUserPassword = "test";
     private static final String testUserDn = "cn=bill,dc=example,dc=org";
+    private static final String requiredGroupDn = "cn=cassandra-users,dc=example,dc=org";
+    private static final String nonMemberUserName = "alice";
+    private static final String nonMemberUserPassword = "test";
     private static final String defaultRoleName = "default_role";
     private static final String basicQuery = "SELECT * FROM system.local;";
 
@@ -86,6 +91,9 @@ public abstract class AbstractLDAPTest {
 
             logger.info("[second node]: login bill");
             context.execute(context.secondNode, testUserName, testUserPassword, basicQuery, "datacenter2", true);
+
+            logger.info("[first node]: login alice (not in group)");
+            context.executeExpectAuthenticationFailure(context.firstNode, nonMemberUserName, nonMemberUserPassword, basicQuery, cassandraDataCenter1);
 
             testDefaultRoleMembership(ldapContainer, context);
         } catch (final Exception ex) {
@@ -219,6 +227,50 @@ public abstract class AbstractLDAPTest {
             }
         }
 
+        public synchronized void executeExpectAuthenticationFailure(Cassandra node,
+                                                                    String username,
+                                                                    String password,
+                                                                    String query,
+                                                                    String dc)
+        {
+            try (final Session session = Cluster.builder()
+                    .addContactPoint(node.getSettings().getAddress().getHostAddress())
+                    .withLoadBalancingPolicy(new DCAwareRoundRobinPolicy.Builder().withLocalDc(dc).build())
+                    .withAuthProvider(new PlainTextAuthProvider(username, password))
+                    .build().connect()) {
+                session.execute(query);
+                fail("Expected authentication to fail for user " + username);
+            } catch (final Exception ex) {
+                assertAuthenticationFailure(ex);
+            }
+        }
+
+        private void assertAuthenticationFailure(final Exception ex)
+        {
+            if (ex instanceof AuthenticationException)
+            {
+                return;
+            }
+
+            if (ex instanceof NoHostAvailableException)
+            {
+                NoHostAvailableException nhae = (NoHostAvailableException) ex;
+                for (Throwable error : nhae.getErrors().values())
+                {
+                    if (error instanceof AuthenticationException)
+                    {
+                        return;
+                    }
+                    if (error != null && error.getCause() instanceof AuthenticationException)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            fail("Expected authentication failure, got: " + ex);
+        }
+
         public void waitForClosedPort(String hostname, int port) {
             await().timeout(FIVE_MINUTES).until(() ->
             {
@@ -322,12 +374,13 @@ public abstract class AbstractLDAPTest {
             Properties ldapProperties = new Properties();
 
             try (InputStream is = new BufferedInputStream(new FileInputStream(ldapPropertiesFile))) {
-                ldapProperties.load(is);
+            ldapProperties.load(is);
             } catch (Exception ex) {
                 throw new IllegalStateException("Unable to read content of ldap.properties!");
             }
 
             ldapProperties.setProperty("ldap_uri", "ldap://127.0.0.1:" + ldapPort + "/dc=example,dc=org");
+            ldapProperties.setProperty("required_group_dn", requiredGroupDn);
 
             File tempFile = Files.createTempFile("ldap-test", ".properties").toFile();
             ldapProperties.store(new FileWriter(tempFile, true), "comments");

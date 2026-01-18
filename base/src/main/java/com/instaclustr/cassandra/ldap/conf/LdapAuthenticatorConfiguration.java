@@ -51,6 +51,8 @@ public final class LdapAuthenticatorConfiguration
 
     public static final String FILTER_TEMPLATE = "filter_template";
 
+    public static final String REQUIRED_GROUP_DN = "required_group_dn";
+
     public static final String CASSANDRA_AUTH_CACHE_ENABLED_PROP = "auth_cache_enabled";
 
     // allow as default or disallow empty passwords when trying to connect to ldap server - empty passwords make do some unexpected behavior
@@ -149,6 +151,17 @@ public final class LdapAuthenticatorConfiguration
         }
 
         properties.setProperty(FILTER_TEMPLATE, filterTemplate);
+
+        String requiredGroupDn = properties.getProperty(REQUIRED_GROUP_DN);
+        if (requiredGroupDn != null)
+        {
+            String trimmedGroupDn = requiredGroupDn.trim();
+            if (trimmedGroupDn.isEmpty())
+            {
+                throw new ConfigurationException(format("%s can not be empty when set.", REQUIRED_GROUP_DN));
+            }
+            properties.setProperty(REQUIRED_GROUP_DN, trimmedGroupDn);
+        }
 
         properties.put(LdapAuthenticatorConfiguration.CONTEXT_FACTORY_PROP, properties.getProperty(CONTEXT_FACTORY_PROP, DEFAULT_CONTEXT_FACTORY));
         properties.put(LdapAuthenticatorConfiguration.LDAP_URI_PROP, properties.getProperty(LDAP_URI_PROP));

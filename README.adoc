@@ -86,6 +86,9 @@ The content of the configuration file is as follows:
 |filter_template
 |template for searching in LDAP, explanation further in this readme, defaults to `(cn=%s)`
 
+|required_group_dn
+|if set, only users who are members of this LDAP group (full DN) can log in
+
 |auth_cache_enabled
 |relevant for Cassandra 3.11 and 4.0 plugins, defaults to `false`
 
